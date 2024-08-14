@@ -140,8 +140,7 @@ public:
 		return it->second;
 	}
 
-	class autorelease_value {
-	public:
+	struct autorelease_value {
 		T value;
 
 		autorelease_value(const T& value, flyweight& flyweight, const std::tuple<Args...>& arg_tuple)
@@ -232,8 +231,7 @@ public:
 		return value.value;
 	}
 
-	class autorelease_value {
-	public:
+	struct autorelease_value {
 		T value;
 
 		autorelease_value(const T& value, flyweight_refcounted& flyweight, const std::tuple<Args...>& arg_tuple)
