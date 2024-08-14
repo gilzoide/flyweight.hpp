@@ -7,11 +7,11 @@
 TEST_CASE("flyweight<int, int>", "[flyweight]") {
 	flyweight::flyweight_refcounted<int, int> ints { [](int i) { return i; }, [](int&) {} };
 	SECTION("dummy") {
-		auto one = ints.get(1);
+		auto one = ints.get_tuple(1);
 		REQUIRE(one == 1);
 		REQUIRE(ints.load_count(1) == 1);
 
-		auto other_one = ints.get_autorelease(1);
+		auto other_one = ints.get_autorelease_tuple(1);
 		REQUIRE(ints.load_count(1) == 2);
 
 		ints.release(1);

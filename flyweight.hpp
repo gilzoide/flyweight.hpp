@@ -54,6 +54,39 @@ namespace detail {
 			return refcount <= 0;
 		}
 	};
+
+#if __cpp_lib_apply
+	template<typename Fn, typename... Args>
+	auto apply(Fn&& f, std::tuple<Args...>&& t) {
+		return std::apply(std::move(f), std::move(t));
+	}
+#else
+	// Unpacking tuple with int sequence on C++11
+	// Reference: https://stackoverflow.com/a/7858971
+	template<int...>
+	struct seq {};
+
+	template<int N, int... S>
+	struct gens : gens<N-1, N-1, S...> {};
+
+	template<int... S>
+	struct gens<0, S...> {
+		using type = seq<S...>;
+	};
+
+	template<typename... Args>
+	struct apply_impl {
+		template<typename Fn, int... S>
+		static auto invoke(Fn&& f, std::tuple<Args...>&& t, seq<S...>) {
+			return f(std::forward<Args>(std::get<S>(t))...);
+		}
+	};
+
+	template<typename Fn, typename... Args>
+	auto apply(Fn&& f, std::tuple<Args...>&& t) {
+		return apply_impl<Args...>::invoke(std::move(f), std::move(t), typename gens<sizeof...(Args)>::type{});
+	}
+#endif
 }
 
 template<typename T, typename... Args>
@@ -99,31 +132,29 @@ public:
 		}
 		return it->second;
 	}
-#if __cpp_lib_apply
 	T& get_tuple(const std::tuple<Args...>& arg_tuple) {
 		auto it = map.find(arg_tuple);
 		if (it == map.end()) {
-			it = map.emplace(arg_tuple, std::apply(creator, arg_tuple)).first;
+			it = map.emplace(arg_tuple, detail::apply(creator, (std::tuple<Args...>) arg_tuple)).first;
 		}
 		return it->second;
 	}
-#endif
 
 	class autorelease_value {
 	public:
 		T value;
 
-		autorelease_value(flyweight& flyweight, Args&&... args)
-			: value(flyweight.get(std::forward<Args>(args)...))
+		autorelease_value(const T& value, flyweight& flyweight, const std::tuple<Args...>& arg_tuple)
+			: value(value)
 			, flyweight(flyweight)
-			, args(std::forward<Args>(args)...)
+			, arg_tuple(arg_tuple)
 		{
 		}
 
-		T& operator *() {
+		T& operator*() {
 			return value;
 		}
-		T& operator ->() {
+		T& operator->() {
 			return value;
 		}
 		operator T&() {
@@ -131,17 +162,21 @@ public:
 		}
 
 		~autorelease_value() {
-			flyweight.release_tuple(args);
+			flyweight.release_tuple(arg_tuple);
 		}
 
 	private:
 		flyweight& flyweight;
-		std::tuple<Args...> args;
+		std::tuple<Args...> arg_tuple;
 	};
 	autorelease_value get_autorelease(Args&&... args) {
+		return get_autorelease_tuple({ std::forward<Args>(args)... });
+	}
+	autorelease_value get_autorelease_tuple(const std::tuple<Args...>& arg_tuple) {
 		return {
+			get_tuple(arg_tuple),
 			*this,
-			std::forward<Args>(args)...,
+			arg_tuple,
 		};
 	}
 
@@ -191,50 +226,43 @@ public:
 		value.reference();
 		return value.value;
 	}
-#if __cpp_lib_apply
 	T& get_tuple(const std::tuple<Args...>& arg_tuple) {
 		auto& value = base::get_tuple(arg_tuple);
 		value.reference();
 		return value.value;
 	}
-#endif
 
 	class autorelease_value {
 	public:
 		T value;
 
-		autorelease_value(flyweight_refcounted& flyweight, Args&&... args)
-			: value(flyweight.get(std::forward<Args>(args)...))
+		autorelease_value(const T& value, flyweight_refcounted& flyweight, const std::tuple<Args...>& arg_tuple)
+			: value(value)
 			, flyweight(flyweight)
-			, args(std::forward<Args>(args)...)
+			, arg_tuple(arg_tuple)
 		{
 		}
 
-#if __cpp_lib_apply
 		autorelease_value(const autorelease_value& other)
 			: value(other.flyweight.get_tuple(other.args))
 			, flyweight(other.flyweight)
-			, args(other.args)
+			, arg_tuple(other.arg_tuple)
 		{
 		}
 		autorelease_value& operator=(const autorelease_value& other)
 		{
 			// release previous value
-			flyweight.release_tuple(args);
+			flyweight.release_tuple(arg_tuple);
 			// now update fields, making sure to increment reference count
-			value = other.flyweight.get_tuple(other.args);
+			value = other.flyweight.get_tuple(other.arg_tuple);
 			flyweight = other.flyweight;
-			args = other.args;
+			arg_tuple = other.arg_tuple;
 		}
-#else
-		autorelease_value(const autorelease_value& other) = delete;
-		autorelease_value& operator=(const autorelease_value& other) = delete;
-#endif
 
-		T& operator *() {
+		T& operator*() {
 			return value;
 		}
-		T& operator ->() {
+		T& operator->() {
 			return value;
 		}
 		operator T&() {
@@ -242,17 +270,21 @@ public:
 		}
 
 		~autorelease_value() {
-			flyweight.release_tuple(args);
+			flyweight.release_tuple(arg_tuple);
 		}
 
 	private:
 		flyweight_refcounted& flyweight;
-		std::tuple<Args...> args;
+		std::tuple<Args...> arg_tuple;
 	};
 	autorelease_value get_autorelease(Args&&... args) {
+		return get_autorelease_tuple({ std::forward<Args>(args)... });
+	}
+	autorelease_value get_autorelease_tuple(const std::tuple<Args...>& arg_tuple) {
 		return {
+			get_tuple(arg_tuple),
 			*this,
-			std::forward<Args>(args)...,
+			arg_tuple,
 		};
 	}
 
