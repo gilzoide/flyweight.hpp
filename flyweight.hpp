@@ -276,10 +276,11 @@ public:
 		};
 	}
 
-	size_t load_count(Args&&... args) const {
-		return load_count_tuple({ std::forward<Args>(args)... });
+	size_t reference_count(Args&&... args) const {
+		return reference_count_tuple({ std::forward<Args>(args)... });
 	}
 	size_t load_count_tuple(const std::tuple<Args...>& arg_tuple) const {
+	size_t reference_count_tuple(const std::tuple<Args...>& arg_tuple) const {
 		auto it = base::map.find(arg_tuple);
 		if (it != base::map.end()) {
 			return it->second.refcount;

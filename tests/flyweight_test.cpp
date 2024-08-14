@@ -9,18 +9,18 @@ TEST_CASE("flyweight<int, int>", "[flyweight]") {
 	SECTION("dummy") {
 		auto one = ints.get_tuple(1);
 		REQUIRE(one == 1);
-		REQUIRE(ints.load_count(1) == 1);
+		REQUIRE(ints.reference_count(1) == 1);
 
 		auto other_one = ints.get_autorelease_tuple(1);
-		REQUIRE(ints.load_count(1) == 2);
+		REQUIRE(ints.reference_count(1) == 2);
 
 		ints.release(1);
-		REQUIRE(ints.load_count(1) == 1);
+		REQUIRE(ints.reference_count(1) == 1);
 
 		ints.release(1);
-		REQUIRE(ints.load_count(1) == 0);
+		REQUIRE(ints.reference_count(1) == 0);
 		ints.release(1);
-		REQUIRE(ints.load_count(1) == 0);
+		REQUIRE(ints.reference_count(1) == 0);
 	}
 }
 
