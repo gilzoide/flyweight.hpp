@@ -63,52 +63,6 @@ namespace detail {
 		}
 	};
 
-	template<typename T, typename Flyweight, typename ArgTuple>
-	struct autorelease_value {
-		T value;
-
-		autorelease_value(const T& value, Flyweight& flyweight, const ArgTuple& arg_tuple)
-			: value(value)
-			, flyweight(flyweight)
-			, arg_tuple(arg_tuple)
-		{
-		}
-
-		autorelease_value(const autorelease_value& other)
-			: value(other.flyweight.get_tuple(other.args))
-			, flyweight(other.flyweight)
-			, arg_tuple(other.arg_tuple)
-		{
-		}
-		autorelease_value& operator=(const autorelease_value& other)
-		{
-			// release previous value
-			flyweight.release_tuple(arg_tuple);
-			// now update fields, making sure to re-get the value to increment reference counting if necessary
-			value = other.flyweight.get_tuple(other.arg_tuple);
-			flyweight = other.flyweight;
-			arg_tuple = other.arg_tuple;
-		}
-
-		T& operator*() {
-			return value;
-		}
-		T& operator->() {
-			return value;
-		}
-		operator T&() {
-			return value;
-		}
-
-		~autorelease_value() {
-			flyweight.release_tuple(arg_tuple);
-		}
-
-	private:
-		Flyweight& flyweight;
-		ArgTuple arg_tuple;
-	};
-
 #if __cpp_lib_apply
 	template<typename Fn, typename... Args>
 	auto apply(Fn&& f, std::tuple<Args...>&& t) {
@@ -143,6 +97,7 @@ namespace detail {
 #endif
 }
 
+
 /// The default Creator functor used by flyweight.
 /// Constructs the value `T` from arguments of type `Args`.
 template<typename T, typename... Args>
@@ -161,9 +116,61 @@ struct default_deleter {
 	}
 };
 
+/// RAII-enabled struct that releases a value back to the flyweight upon destruction.
+template<typename T, typename Flyweight, typename ArgTuple>
+struct autorelease_value {
+	T& value;
+
+	autorelease_value(T& value, Flyweight& flyweight, const ArgTuple& arg_tuple)
+		: value(value)
+		, flyweight(flyweight)
+		, arg_tuple(arg_tuple)
+	{
+	}
+
+	/// Copy constructor.
+	/// Calls `flyweight::get_tuple` to make sure to increment reference counting if necessary
+	autorelease_value(const autorelease_value& other)
+		: value(other.flyweight.get_tuple(other.args))
+		, flyweight(other.flyweight)
+		, arg_tuple(other.arg_tuple)
+	{
+	}
+	/// Copy assignment.
+	/// Releases the previous value and `flyweight::get_tuple` to make sure reference counting is correct.
+	autorelease_value& operator=(const autorelease_value& other)
+	{
+		// release previous value
+		flyweight.release_tuple(arg_tuple);
+		// re-get the value to make sure reference counting is correct
+		value = other.flyweight.get_tuple(other.arg_tuple);
+		flyweight = other.flyweight;
+		arg_tuple = other.arg_tuple;
+	}
+
+	T& operator*() {
+		return value;
+	}
+	T& operator->() {
+		return value;
+	}
+	operator T&() {
+		return value;
+	}
+
+	/// Release value when destroyed.
+	~autorelease_value() {
+		flyweight.release_tuple(arg_tuple);
+	}
+
+private:
+	Flyweight& flyweight;
+	ArgTuple arg_tuple;
+};
+
 template<typename T, typename... Args>
 class flyweight {
-	using autorelease_value = detail::autorelease_value<T, flyweight, std::tuple<Args...>>;
+	using autorelease_value = autorelease_value<T, flyweight, std::tuple<Args...>>;
 public:
 	flyweight() : creator(default_creator<T, Args...>{}), deleter(default_deleter<T>{}) {}
 
@@ -239,7 +246,7 @@ protected:
 template<typename T, typename... Args>
 class flyweight_refcounted : public flyweight<detail::refcounted_value<T>, Args...> {
 	using base = flyweight<detail::refcounted_value<T>, Args...>;
-	using autorelease_value = detail::autorelease_value<T, flyweight_refcounted, std::tuple<Args...>>;
+	using autorelease_value = autorelease_value<T, flyweight_refcounted, std::tuple<Args...>>;
 public:
 	flyweight_refcounted() : base() {}
 
