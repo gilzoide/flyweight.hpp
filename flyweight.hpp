@@ -50,8 +50,9 @@ namespace detail {
 		}
 
 		/// Increment the reference count.
-		void reference() {
+		refcounted_value& reference() {
 			refcount++;
+			return *this;
 		}
 
 		/// Decrement the reference count.
@@ -233,13 +234,11 @@ public:
 
 	T& get(Args&&... args) {
 		auto& value = base::get(std::forward<Args>(args)...);
-		value.reference();
-		return value.value;
+		return value.reference();
 	}
 	T& get_tuple(const std::tuple<Args...>& arg_tuple) {
 		auto& value = base::get_tuple(arg_tuple);
-		value.reference();
-		return value.value;
+		return value.reference();
 	}
 
 	struct autorelease_value {
