@@ -109,6 +109,42 @@ public:
 	}
 #endif
 
+	class autorelease_value {
+	public:
+		T value;
+
+		autorelease_value(flyweight& flyweight, Args&&... args)
+			: value(flyweight.get(std::forward<Args>(args)...))
+			, flyweight(flyweight)
+			, args(std::forward<Args>(args)...)
+		{
+		}
+
+		T& operator *() {
+			return value;
+		}
+		T& operator ->() {
+			return value;
+		}
+		operator T&() {
+			return value;
+		}
+
+		~autorelease_value() {
+			flyweight.release_tuple(args);
+		}
+
+	private:
+		flyweight& flyweight;
+		std::tuple<Args...> args;
+	};
+	autorelease_value get_autorelease(Args&&... args) {
+		return {
+			*this,
+			std::forward<Args>(args)...,
+		};
+	}
+
 	bool is_loaded(Args&&... args) const {
 		return is_loaded_tuple({ std::forward<Args>(args)... });
 	}
@@ -162,6 +198,63 @@ public:
 		return value.value;
 	}
 #endif
+
+	class autorelease_value {
+	public:
+		T value;
+
+		autorelease_value(flyweight_refcounted& flyweight, Args&&... args)
+			: value(flyweight.get(std::forward<Args>(args)...))
+			, flyweight(flyweight)
+			, args(std::forward<Args>(args)...)
+		{
+		}
+
+#if __cpp_lib_apply
+		autorelease_value(const autorelease_value& other)
+			: value(other.flyweight.get_tuple(other.args))
+			, flyweight(other.flyweight)
+			, args(other.args)
+		{
+		}
+		autorelease_value& operator=(const autorelease_value& other)
+		{
+			// release previous value
+			flyweight.release_tuple(args);
+			// now update fields, making sure to increment reference count
+			value = other.flyweight.get_tuple(other.args);
+			flyweight = other.flyweight;
+			args = other.args;
+		}
+#else
+		autorelease_value(const autorelease_value& other) = delete;
+		autorelease_value& operator=(const autorelease_value& other) = delete;
+#endif
+
+		T& operator *() {
+			return value;
+		}
+		T& operator ->() {
+			return value;
+		}
+		operator T&() {
+			return value;
+		}
+
+		~autorelease_value() {
+			flyweight.release_tuple(args);
+		}
+
+	private:
+		flyweight_refcounted& flyweight;
+		std::tuple<Args...> args;
+	};
+	autorelease_value get_autorelease(Args&&... args) {
+		return {
+			*this,
+			std::forward<Args>(args)...,
+		};
+	}
 
 	size_t load_count(Args&&... args) const {
 		return load_count_tuple({ std::forward<Args>(args)... });

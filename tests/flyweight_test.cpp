@@ -11,7 +11,7 @@ TEST_CASE("flyweight<int, int>", "[flyweight]") {
 		REQUIRE(one == 1);
 		REQUIRE(ints.load_count(1) == 1);
 
-		auto other_one = ints.get(1);
+		auto other_one = ints.get_autorelease(1);
 		REQUIRE(ints.load_count(1) == 2);
 
 		ints.release(1);
