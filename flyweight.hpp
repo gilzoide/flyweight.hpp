@@ -1,8 +1,7 @@
 #pragma once
 
-#include <memory>
+#include <functional>
 #include <tuple>
-#include <type_traits>
 #include <unordered_map>
 #include <utility>
 
@@ -36,92 +35,145 @@ namespace detail {
 		}
 	};
 
-	template<typename T, typename TPtrReturn, typename TPtrStored, typename... Args>
-	class flyweight_impl {
-		template<typename TMapPtrStored>
-		using map_type = std::unordered_map<std::tuple<Args...>, TMapPtrStored, tuple_hasher<Args...>>;
+	template<typename T>
+	struct refcounted_value {
+		T value;
+		long long refcount;
 
-	public:
-		TPtrReturn get(Args&&... args) {
-			return get_impl(map, std::forward<Args>(args)...);
+		refcounted_value(T&& value) : value(value), refcount(0) {}
+		operator T&() {
+			return value;
 		}
 
-		bool is_loaded(Args&&... args) const {
-			return is_loaded_tuple({ std::forward<Args>(args)... });
-		}
-		bool is_loaded_tuple(const std::tuple<Args...>& arg_tuple) const {
-			return map.find(arg_tuple) != map.end();
+		void reference() {
+			refcount++;
 		}
 
-		void release(Args&&... args) {
-			release_tuple({ std::forward<Args>(args)... });
-		}
-		void release_tuple(const std::tuple<Args...>& arg_tuple) {
-			map.erase(arg_tuple);
-		}
-
-	protected:
-		map_type<TPtrStored> map;
-
-	private:
-		static T* get_impl(map_type<std::unique_ptr<T>>& map, Args&&... args) {
-			std::tuple<Args...> arg_tuple { std::forward<Args>(args)... };
-			auto it = map.emplace(arg_tuple, std::unique_ptr<T>{});
-			if (it.second) {
-				it.first->second = std::make_unique<T>(std::forward<Args>(args)...);
-			}
-			return it.first->second.get();
-		}
-
-		static std::shared_ptr<T> get_impl(map_type<std::shared_ptr<T>>& map, Args&&... args) {
-			std::tuple<Args...> arg_tuple { args... };
-			auto it = map.emplace(arg_tuple, std::shared_ptr<T>{});
-			if (it.second) {
-				it.first->second = std::make_shared<T>(std::forward<Args>(args)...);
-			}
-			return it.first->second;
-		}
-
-		struct autorelease : public T {
-			autorelease(map_type<std::weak_ptr<T>>& map_ref, Args&&... args)
-				: T(std::forward<Args>(args)...)
-				, map_ref(map_ref)
-				, key(std::forward<Args>(args)...)
-			{
-			}
-
-			~autorelease() {
-				map_ref.erase(key);
-			}
-
-			map_type<std::weak_ptr<T>>& map_ref;
-			std::tuple<Args...> key;
-		};
-		static std::shared_ptr<T> get_impl(map_type<std::weak_ptr<T>>& map, Args&&... args) {
-			std::tuple<Args...> arg_tuple { std::forward<Args>(args)... };
-			auto it = map.emplace(arg_tuple, std::weak_ptr<T>{});
-			if (!it.second) {
-				if (std::shared_ptr<T> value = it.first->second.lock()) {
-					return value;
-				}
-			}
-
-			std::shared_ptr<T> new_value = std::make_shared<autorelease>(map, std::forward<Args>(args)...);
-			it.first->second = new_value;
-			return new_value;
+		bool dereference() {
+			--refcount;
+			return refcount <= 0;
 		}
 	};
 }
 
 template<typename T, typename... Args>
-using flyweight = detail::flyweight_impl<T, T*, std::unique_ptr<T>, Args...>;
+struct default_creator {
+	T operator()(Args&&... args) {
+		return T { std::forward<Args>(args)... };
+	}
+};
+
+template<typename T>
+struct default_deleter {
+	void operator()(T&) {
+		// no-op
+	}
+};
 
 template<typename T, typename... Args>
-using flyweight_shared = detail::flyweight_impl<T, std::shared_ptr<T>, std::shared_ptr<T>, Args...>;
+class flyweight {
+public:
+	flyweight() : map(), creator(default_creator<T, Args...>{}), deleter(default_deleter<T>{}) {}
+
+	template<typename Creator>
+	flyweight(Creator&& creator)
+		: map()
+		, creator([creator](Args&&... args) { return creator(std::forward<Args>(args)...); })
+		, deleter(default_deleter<T>{})
+	{
+	}
+
+	template<typename Creator, typename Deleter>
+	flyweight(Creator&& creator, Deleter&& deleter)
+		: map()
+		, creator([creator](Args&&... args) { return creator(std::forward<Args>(args)...); })
+		, deleter([deleter](T& value) { deleter(value); })
+	{
+	}
+
+	T& get(Args&&... args) {
+		std::tuple<Args...> arg_tuple = { std::forward<Args>(args)... };
+		auto it = map.find(arg_tuple);
+		if (it == map.end()) {
+			it = map.emplace(arg_tuple, creator(std::forward<Args>(args)...)).first;
+		}
+		return it->second;
+	}
+
+	bool is_loaded(Args&&... args) const {
+		return is_loaded_tuple({ std::forward<Args>(args)... });
+	}
+	bool is_loaded_tuple(const std::tuple<Args...>& arg_tuple) const {
+		return map.find(arg_tuple) != map.end();
+	}
+
+	bool release(Args&&... args) {
+		return release_tuple({ std::forward<Args>(args)... });
+	}
+	bool release_tuple(const std::tuple<Args...>& arg_tuple) {
+		auto it = map.find(arg_tuple);
+		if (it != map.end()) {
+			deleter(it->second);
+			map.erase(it);
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+
+protected:
+	std::unordered_map<std::tuple<Args...>, T, detail::tuple_hasher<Args...>> map;
+	std::function<T(Args&&...)> creator;
+	std::function<void(T&)> deleter;
+};
 
 template<typename T, typename... Args>
-using flyweight_autorelease = typename std::enable_if<std::is_class<T>::value,
-	detail::flyweight_impl<T, std::shared_ptr<T>, std::weak_ptr<T>, Args...>
->::type;
+class flyweight_refcounted : public flyweight<detail::refcounted_value<T>, Args...> {
+	using base = flyweight<detail::refcounted_value<T>, Args...>;
+
+public:
+	flyweight_refcounted() : base() {}
+
+	template<typename Creator>
+	flyweight_refcounted(Creator&& creator) : base(creator) {}
+
+	template<typename Creator, typename Deleter>
+	flyweight_refcounted(Creator&& creator, Deleter&& deleter) : base(creator, deleter) {}
+
+	T& get(Args&&... args) {
+		auto& value = base::get(std::forward<Args>(args)...);
+		value.reference();
+		return value.value;
+	}
+
+	size_t load_count(Args&&... args) const {
+		return load_count_tuple({ std::forward<Args>(args)... });
+	}
+	size_t load_count_tuple(const std::tuple<Args...>& arg_tuple) const {
+		auto it = base::map.find(arg_tuple);
+		if (it != base::map.end()) {
+			return it->second.refcount;
+		}
+		else {
+			return 0;
+		}
+	}
+
+	bool release(Args&&... args) {
+		return release_tuple({ std::forward<Args>(args)... });
+	}
+	bool release_tuple(const std::tuple<Args...>& arg_tuple) {
+		auto it = base::map.find(arg_tuple);
+		if (it != base::map.end() && it->second.dereference()) {
+			base::deleter(it->second);
+			base::map.erase(it);
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+};
 
 }

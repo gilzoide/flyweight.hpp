@@ -5,17 +5,29 @@
 #include <flyweight.hpp>
 
 TEST_CASE("flyweight<int, int>", "[flyweight]") {
-	flyweight::flyweight<int, int> ints;
+	flyweight::flyweight_refcounted<int, int> ints { [](int i) { return i; }, [](int&) {} };
 	SECTION("dummy") {
 		auto one = ints.get(1);
-		REQUIRE(*one == 1);
+		REQUIRE(one == 1);
+		REQUIRE(ints.load_count(1) == 1);
+
+		auto other_one = ints.get(1);
+		REQUIRE(ints.load_count(1) == 2);
+
+		ints.release(1);
+		REQUIRE(ints.load_count(1) == 1);
+
+		ints.release(1);
+		REQUIRE(ints.load_count(1) == 0);
+		ints.release(1);
+		REQUIRE(ints.load_count(1) == 0);
 	}
 }
 
 TEST_CASE("flyweight<std::string, std::string_view>", "[flyweight]") {
-	flyweight::flyweight_autorelease<std::string, std::string_view> ints;
+	flyweight::flyweight<const std::string, std::string_view> ints;
 	SECTION("dummy") {
-		auto one = ints.get("Test 1");
-		REQUIRE(*one == "Test 1");
+		auto& one = ints.get("Test 1");
+		REQUIRE(one == "Test 1");
 	}
 }
