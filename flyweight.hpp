@@ -8,7 +8,7 @@
 namespace flyweight {
 
 namespace detail {
-	/// Combine two hash values
+	/// Combine two integer hash values
 	/// @see https://github.com/boostorg/multiprecision/blob/de3243f3e5427c6ab5b050aac03bc89c6e03e2bc/include/boost/multiprecision/detail/hash.hpp#L35-L41
 	constexpr static size_t hash_combine(std::size_t a, std::size_t b) {
 		return a ^ b + 0x9e3779b9 + (a << 6) + (a >> 2);
@@ -35,20 +35,27 @@ namespace detail {
 		}
 	};
 
+	/// Reference counted value, used for flyweight_refcounted
 	template<typename T>
 	struct refcounted_value {
 		T value;
 		long long refcount;
 
+		/// Construct a value with an initial reference count of 0.
+		/// `reference` should be called right after constructing this.
 		refcounted_value(T&& value) : value(value), refcount(0) {}
+
 		operator T&() {
 			return value;
 		}
 
+		/// Increment the reference count.
 		void reference() {
 			refcount++;
 		}
 
+		/// Decrement the reference count.
+		/// @return `true` in case the count reached zero, `false` otherwise.
 		bool dereference() {
 			--refcount;
 			return refcount <= 0;
@@ -89,6 +96,8 @@ namespace detail {
 #endif
 }
 
+/// The default Creator functor used by flyweight.
+/// Constructs the value `T` from arguments of type `Args`.
 template<typename T, typename... Args>
 struct default_creator {
 	T operator()(Args&&... args) {
@@ -96,6 +105,8 @@ struct default_creator {
 	}
 };
 
+/// The default Deleter functor used by flyweight.
+/// Doesn't do anything, as the value's destructor will be called when erased from flyweight's map.
 template<typename T>
 struct default_deleter {
 	void operator()(T&) {

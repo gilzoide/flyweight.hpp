@@ -24,10 +24,10 @@ TEST_CASE("flyweight<int, int>", "[flyweight]") {
 	}
 }
 
-TEST_CASE("flyweight<std::string, std::string_view>", "[flyweight]") {
-	flyweight::flyweight<const std::string, std::string_view> ints;
+TEST_CASE("flyweight<const std::string, std::string_view>", "[flyweight]") {
+	flyweight::flyweight<const std::string, std::string_view> strings;
 	SECTION("dummy") {
-		auto& one = ints.get("Test 1");
+		auto& one = strings.get("Test 1");
 		REQUIRE(one == "Test 1");
 	}
 }
