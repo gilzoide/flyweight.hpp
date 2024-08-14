@@ -99,6 +99,15 @@ public:
 		}
 		return it->second;
 	}
+#if __cpp_lib_apply
+	T& get_tuple(const std::tuple<Args...>& arg_tuple) {
+		auto it = map.find(arg_tuple);
+		if (it == map.end()) {
+			it = map.emplace(arg_tuple, std::apply(creator, arg_tuple)).first;
+		}
+		return it->second;
+	}
+#endif
 
 	bool is_loaded(Args&&... args) const {
 		return is_loaded_tuple({ std::forward<Args>(args)... });
@@ -146,6 +155,13 @@ public:
 		value.reference();
 		return value.value;
 	}
+#if __cpp_lib_apply
+	T& get_tuple(const std::tuple<Args...>& arg_tuple) {
+		auto& value = base::get_tuple(arg_tuple);
+		value.reference();
+		return value.value;
+	}
+#endif
 
 	size_t load_count(Args&&... args) const {
 		return load_count_tuple({ std::forward<Args>(args)... });
