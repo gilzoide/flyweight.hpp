@@ -118,20 +118,18 @@ struct default_deleter {
 template<typename T, typename... Args>
 class flyweight {
 public:
-	flyweight() : map(), creator(default_creator<T, Args...>{}), deleter(default_deleter<T>{}) {}
+	flyweight() : creator(default_creator<T, Args...>{}), deleter(default_deleter<T>{}) {}
 
 	template<typename Creator>
 	flyweight(Creator&& creator)
-		: map()
-		, creator([creator](Args&&... args) { return creator(std::forward<Args>(args)...); })
+		: creator([creator](Args&&... args) { return creator(std::forward<Args>(args)...); })
 		, deleter(default_deleter<T>{})
 	{
 	}
 
 	template<typename Creator, typename Deleter>
 	flyweight(Creator&& creator, Deleter&& deleter)
-		: map()
-		, creator([creator](Args&&... args) { return creator(std::forward<Args>(args)...); })
+		: creator([creator](Args&&... args) { return creator(std::forward<Args>(args)...); })
 		, deleter([deleter](T& value) { deleter(value); })
 	{
 	}
