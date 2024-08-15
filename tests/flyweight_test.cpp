@@ -7,12 +7,14 @@
 TEST_CASE("flyweight<int, int>", "[flyweight]") {
 	flyweight::flyweight_refcounted<int, int> ints { [](int i) { return i; }, [](int&) {} };
 	SECTION("dummy") {
-		auto one = ints.get_tuple(1);
+		auto& one = ints.get_tuple(1);
 		REQUIRE(one == 1);
 		REQUIRE(ints.reference_count(1) == 1);
 
 		auto other_one = ints.get_autorelease_tuple(1);
 		REQUIRE(ints.reference_count(1) == 2);
+
+		REQUIRE(&one == &other_one.value);
 
 		ints.release(1);
 		REQUIRE(ints.reference_count(1) == 1);
