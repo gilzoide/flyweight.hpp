@@ -270,8 +270,9 @@ private:
  */
 template<typename T, typename... Args>
 class flyweight {
-	using autorelease_value = autorelease_value<T, flyweight, std::tuple<Args...>>;
 public:
+	using autorelease_value = autorelease_value<T, flyweight, std::tuple<Args...>>;
+
 	/// Default constructor.
 	/// Uses `default_creator` as the value creator and `default_deleter` as the value deleter.
 	flyweight() : creator(default_creator<T, Args...>{}), deleter(default_deleter<T>{}) {}
@@ -389,8 +390,9 @@ protected:
 template<typename T, typename... Args>
 class flyweight_refcounted : public flyweight<detail::refcounted_value<T>, Args...> {
 	using base = flyweight<detail::refcounted_value<T>, Args...>;
-	using autorelease_value = autorelease_value<T, flyweight_refcounted, std::tuple<Args...>>;
 public:
+	using autorelease_value = autorelease_value<T, flyweight_refcounted, std::tuple<Args...>>;
+
 	/// @see flyweight()
 	flyweight_refcounted() : base() {}
 
