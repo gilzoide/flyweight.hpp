@@ -83,7 +83,7 @@ Features</h1>
 <li>Use <code>flyweight::release</code> to release values, destroying them and releasing memory</li>
 <li>Supports custom creator functors when the flyweight object is got for the first time</li>
 <li>Supports custom deleter functors when the object is released</li>
-<li>Use <code>flyweight::get_autorelease</code> for a RAII idiom that automatically release values</li>
+<li>Use <code>flyweight::get_autorelease</code> for a RAII idiom that automatically releases values</li>
 <li>Alternative <code>flyweight_refcounted</code> that employs reference counting. Reference counts are incremented when calling <code>get</code> and decremented when calling <code>release</code>. The value is destroyed only when the reference count reaches zero.</li>
 </ul>
 <h1><a class="anchor" id="autotoc_md2"></a>
@@ -136,9 +136,13 @@ Usage example</h1>
 <div class="line">}</div>
 <div class="line"><span class="comment">// At this point, `autoreleased_file1_data` released &quot;file1&quot; back to the flyweight.</span></div>
 <div class="line">assert(file_data_cache.reference_count(<span class="stringliteral">&quot;file1&quot;</span>) == 1);</div>
-<div class="ttc" id="aclassflyweight_1_1flyweight__refcounted_html"><div class="ttname"><a href="classflyweight_1_1flyweight__refcounted.html">flyweight::flyweight_refcounted</a></div><div class="ttdef"><b>Definition:</b> flyweight.hpp:390</div></div>
-<div class="ttc" id="aclassflyweight_1_1flyweight__refcounted_html_aa709e0e3a3a508dd8db14338d1f6b555"><div class="ttname"><a href="classflyweight_1_1flyweight__refcounted.html#aa709e0e3a3a508dd8db14338d1f6b555">flyweight::flyweight_refcounted::get</a></div><div class="ttdeci">T &amp; get(const std::tuple&lt; Args... &gt; &amp;arg_tuple)</div><div class="ttdef"><b>Definition:</b> flyweight.hpp:407</div></div>
+<div class="ttc" id="aclassflyweight_1_1flyweight__refcounted_html"><div class="ttname"><a href="classflyweight_1_1flyweight__refcounted.html">flyweight::flyweight_refcounted</a></div><div class="ttdef"><b>Definition:</b> flyweight.hpp:392</div></div>
+<div class="ttc" id="aclassflyweight_1_1flyweight__refcounted_html_aa709e0e3a3a508dd8db14338d1f6b555"><div class="ttname"><a href="classflyweight_1_1flyweight__refcounted.html#aa709e0e3a3a508dd8db14338d1f6b555">flyweight::flyweight_refcounted::get</a></div><div class="ttdeci">T &amp; get(const std::tuple&lt; Args... &gt; &amp;arg_tuple)</div><div class="ttdef"><b>Definition:</b> flyweight.hpp:410</div></div>
 <div class="ttc" id="aflyweight_8hpp_html"><div class="ttname"><a href="flyweight_8hpp.html">flyweight.hpp</a></div></div>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md3"></a>
+Integrating with CMake</h1>
+<p>You can integrate <a class="el" href="flyweight_8hpp.html">flyweight.hpp</a> with CMake targets by adding a copy of this repository and linking with the <code><a class="el" href="flyweight_8hpp.html">flyweight.hpp</a></code> target: </p><div class="fragment"><div class="line">add_subdirectory(path/to/flyweight.hpp)</div>
+<div class="line">target_link_libraries(my_awesome_target flyweight.hpp)</div>
 </div><!-- fragment --> </div></div><!-- PageDoc -->
 </div><!-- contents -->
 <!-- start footer part -->
