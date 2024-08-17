@@ -271,6 +271,7 @@ private:
 template<typename T, typename... Args>
 class flyweight {
 public:
+	using value = T;
 	using autorelease_value = autorelease_value<T, flyweight, std::tuple<Args...>>;
 
 	/// Default constructor.
