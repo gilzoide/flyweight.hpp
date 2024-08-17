@@ -12,7 +12,7 @@ Single header implementation of the [Flyweight](https://en.wikipedia.org/wiki/Fl
 - Use `flyweight::release` to release values, destroying them and releasing memory
 - Supports custom creator functors when the flyweight object is got for the first time
 - Supports custom deleter functors when the object is released
-- Use `flyweight::get_autorelease` for a RAII idiom that automatically release values
+- Use `flyweight::get_autorelease` for a RAII idiom that automatically releases values
 - Alternative `flyweight_refcounted` that employs reference counting.
   Reference counts are incremented when calling `get` and decremented when calling `release`.
   The value is destroyed only when the reference count reaches zero.
@@ -69,4 +69,12 @@ assert(file_data_cache.is_loaded("file1"));
 }
 // At this point, `autoreleased_file1_data` released "file1" back to the flyweight.
 assert(file_data_cache.reference_count("file1") == 1);
+```
+
+
+## Integrating with CMake
+You can integrate flyweight.hpp with CMake targets by adding a copy of this repository and linking with the `flyweight.hpp` target:
+```cmake
+add_subdirectory(path/to/flyweight.hpp)
+target_link_libraries(my_awesome_target flyweight.hpp)
 ```
