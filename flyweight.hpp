@@ -88,7 +88,7 @@ namespace flyweight {
 namespace detail {
 	/// Combine two integer hash values
 	/// @see https://github.com/boostorg/multiprecision/blob/de3243f3e5427c6ab5b050aac03bc89c6e03e2bc/include/boost/multiprecision/detail/hash.hpp#L35-L41
-	constexpr static size_t hash_combine(std::size_t a, std::size_t b) {
+	constexpr static size_t hash_combine(size_t a, size_t b) {
 		return a ^ b + 0x9e3779b9 + (a << 6) + (a >> 2);
 	}
 
@@ -270,8 +270,10 @@ private:
  */
 template<typename T, typename... Args>
 class flyweight {
-	using autorelease_value = autorelease_value<T, flyweight, std::tuple<Args...>>;
 public:
+	using value = T;
+	using autorelease_value = autorelease_value<T, flyweight, std::tuple<Args...>>;
+
 	/// Default constructor.
 	/// Uses `default_creator` as the value creator and `default_deleter` as the value deleter.
 	flyweight() : creator(default_creator<T, Args...>{}), deleter(default_deleter<T>{}) {}
@@ -389,8 +391,9 @@ protected:
 template<typename T, typename... Args>
 class flyweight_refcounted : public flyweight<detail::refcounted_value<T>, Args...> {
 	using base = flyweight<detail::refcounted_value<T>, Args...>;
-	using autorelease_value = autorelease_value<T, flyweight_refcounted, std::tuple<Args...>>;
 public:
+	using autorelease_value = autorelease_value<T, flyweight_refcounted, std::tuple<Args...>>;
+
 	/// @see flyweight()
 	flyweight_refcounted() : base() {}
 
