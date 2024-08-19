@@ -263,7 +263,7 @@ private:
  * When no longer needed, an existing value may be released by calling `flyweight::release`.
  *
  * Flyweights are useful as a way to load heavy objects only once and sharing them whenever necessary, for example images used as icons in an interactive app.
- * Flyweights can also be used to implement function result memoization.
+ * Flyweights can also be used to implement string interning and function result memoization.
  *
  * @tparam T  Value type.
  * @tparam Args  Arguments mapped to loaded values.

@@ -1,4 +1,6 @@
+#include <cstring>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <catch2/catch_test_macros.hpp>
@@ -7,6 +9,42 @@
 #undef assert
 #define assert(...) REQUIRE(__VA_ARGS__)
 TEST_CASE("README.md examples", "[flyweight][readme]") {
+	SECTION("String interning") {
+		// 1. Define your flyweight instance.
+		// By default, values are simply constructed using the arguments passed to `get`,
+		// but in this case we'll define custom creator/deleter functions.
+		flyweight::flyweight<std::string_view, std::string_view> interned_strings {
+			// (optional) Pass a creator functor that will be called to create values.
+			// In this case we duplicate the string to ensure only one version of it exists
+			// and is stable, even when the string_view key is copied.
+			[](std::string_view key) {
+				return std::string_view {
+					strndup(key.data(), key.size()),
+					key.size(),
+				};
+			},
+			// (optional) Pass a deleter functor that will be called when values are released.
+			// In this case, we free the allocated heap data.
+			[](std::string_view& value) {
+				free((void *) value.data());
+			},
+		};
+
+		// 2. Get values.
+		// The first time the value will be created.
+		std::string_view& some_string = interned_strings.get("some string");
+		assert(interned_strings.is_loaded("some string"));
+		assert(some_string == "some string");
+		// Subsequent gets will return the same reference to the same value.
+		std::string_view& also_some_string = interned_strings.get("some string");
+		assert(&some_string == &also_some_string);
+		assert(some_string.data() == also_some_string.data());
+
+		// 3. Release values when you don't need nor want them anymore.
+		interned_strings.release("some string");
+		assert(!interned_strings.is_loaded("some string"));
+	}
+
 	SECTION("File data") {
 		using file_data = std::vector<uint8_t>;
 
@@ -14,7 +52,7 @@ TEST_CASE("README.md examples", "[flyweight][readme]") {
 		// In this case, we use the reference count enabled flyweight implementation.
 		flyweight::flyweight_refcounted<file_data, std::string> file_data_cache {
 			// (optional) Pass a creator functor that will be called to create values.
-			[](const std::string& image_name) {
+			[](const std::string& file_name) {
 				file_data data;
 				// read file data into vector...
 				return data;
