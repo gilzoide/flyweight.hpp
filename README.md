@@ -65,7 +65,6 @@ assert(!interned_strings.is_loaded("some string"));
 File data caching with reference counting:
 ```cpp
 #include <assert>
-#include <string_view>
 #include <vector>
 #include "flyweight.hpp"
 
@@ -73,9 +72,9 @@ using file_data = std::vector<uint8_t>;
 
 // 1. Define your flyweight instance.
 // In this case, we use the reference count enabled flyweight implementation.
-flyweight::flyweight_refcounted<file_data, std::string_view> file_data_cache {
+flyweight::flyweight_refcounted<file_data, std::string> file_data_cache {
     // (optional) Pass a creator functor that will be called to create values.
-    [](std::string_view image_name) {
+    [](const std::string& file_name) {
         file_data data;
         // read file data into vector...
         return data;
