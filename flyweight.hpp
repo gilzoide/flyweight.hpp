@@ -9,9 +9,9 @@
  * // The first template type is the value type.
  * // The rest are argument types used to create values.
  * // In this example, we're defining a resource manager for images.
- * flyweight::flyweight<Image, std::string> my_image_flyweight {
+ * flyweight::flyweight<Image, std::string_view> my_image_flyweight {
  *     // (optional) Pass a creator functor that will be called to create values.
- *     [](const std::string& image_name) {
+ *     [](std::string_view image_name) {
  *         return LoadImage(image_name);
  *     },
  *     // (optional) Pass a deleter functor that will be called when values are released.
@@ -263,7 +263,7 @@ private:
  * When no longer needed, an existing value may be released by calling `flyweight::release`.
  *
  * Flyweights are useful as a way to load heavy objects only once and sharing them whenever necessary, for example images used as icons in an interactive app.
- * Flyweights can also be used to implement function result memoization.
+ * Flyweights can also be used to implement string interning and function result memoization.
  *
  * @tparam T  Value type.
  * @tparam Args  Arguments mapped to loaded values.

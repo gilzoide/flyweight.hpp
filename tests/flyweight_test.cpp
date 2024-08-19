@@ -7,14 +7,33 @@
 #undef assert
 #define assert(...) REQUIRE(__VA_ARGS__)
 TEST_CASE("README.md examples", "[flyweight][readme]") {
+	SECTION("String interning") {
+		// 1. Define your flyweight instance.
+		// By default, values will be constructed using the passed arguments.
+		flyweight::flyweight<const std::string, std::string_view> interned_strings;
+
+		// 2. Get values.
+		// The first time the value will be created.
+		const std::string& some_string = interned_strings.get("some string");
+		assert(interned_strings.is_loaded("some string"));
+		assert(some_string == "some string");
+		// Subsequent gets will return the same reference to the same value.
+		const std::string& also_some_string = interned_strings.get("some string");
+		assert(&some_string == &also_some_string);
+
+		// 3. Release values when you don't need nor want them anymore.
+		interned_strings.release("some string");
+		assert(!interned_strings.is_loaded("some string"));
+	}
+
 	SECTION("File data") {
 		using file_data = std::vector<uint8_t>;
 
 		// 1. Define your flyweight instance.
 		// In this case, we use the reference count enabled flyweight implementation.
-		flyweight::flyweight_refcounted<file_data, std::string> file_data_cache {
+		flyweight::flyweight_refcounted<file_data, std::string_view> file_data_cache {
 			// (optional) Pass a creator functor that will be called to create values.
-			[](const std::string& image_name) {
+			[](std::string_view image_name) {
 				file_data data;
 				// read file data into vector...
 				return data;
