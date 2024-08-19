@@ -9,9 +9,9 @@
  * // The first template type is the value type.
  * // The rest are argument types used to create values.
  * // In this example, we're defining a resource manager for images.
- * flyweight::flyweight<Image, std::string_view> my_image_flyweight {
+ * flyweight::flyweight<Image, std::string> my_image_flyweight {
  *     // (optional) Pass a creator functor that will be called to create values.
- *     [](std::string_view image_name) {
+ *     [](const std::string& image_name) {
  *         return LoadImage(image_name);
  *     },
  *     // (optional) Pass a deleter functor that will be called when values are released.
