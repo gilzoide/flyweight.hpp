@@ -300,6 +300,13 @@ public:
 	{
 	}
 
+	/// Calls the deleter functor to all remaining values, to ensure everything is cleaned up properly.
+	~flyweight() {
+		for (auto it : map) {
+			deleter(it.second);
+		}
+	}
+
 	/// Gets the value associated to the passed arguments.
 	/// If the value was already created, a reference to the existing value is returned.
 	/// Otherwise, the value is created using the creator functor passed on the flyweight's constructor.
