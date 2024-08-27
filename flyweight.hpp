@@ -372,6 +372,14 @@ public:
 		return release(std::tuple<Args...> { std::forward<Args>(args)... });
 	}
 
+	/// Release all values, calling the deleter functor on them.
+	void clear() {
+		for (auto it : map) {
+			deleter(it.second);
+		}
+		map.clear();
+	}
+
 protected:
 	/// Value map.
 	/// Maps the tuple of arguments to an already loaded value of type `T`.

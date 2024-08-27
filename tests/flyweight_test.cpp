@@ -26,9 +26,10 @@ TEST_CASE("README.md examples", "[flyweight][readme]") {
 			// (optional) Pass a deleter functor that will be called when values are released.
 			// In this case, we free the allocated heap data.
 			[](std::string_view& value) {
-				free((void *) value.data());
+				free(const_cast<char *>(value.data()));
 			},
 		};
+
 
 		// 2. Get values.
 		// The first time the value will be created.
@@ -40,7 +41,8 @@ TEST_CASE("README.md examples", "[flyweight][readme]") {
 		assert(&some_string == &also_some_string);
 		assert(some_string.data() == also_some_string.data());
 
-		// 3. Release values when you don't need nor want them anymore.
+
+		// 3. Release values when you don't need/want them anymore.
 		interned_strings.release("some string");
 		assert(!interned_strings.is_loaded("some string"));
 	}
@@ -61,6 +63,7 @@ TEST_CASE("README.md examples", "[flyweight][readme]") {
 			// No need in this case, std::vector will delete the memory automatically when released.
 		};
 
+
 		// 2. Get values.
 		// The first time the value will be created.
 		file_data& file1_data = file_data_cache.get("file1");
@@ -71,7 +74,8 @@ TEST_CASE("README.md examples", "[flyweight][readme]") {
 		file_data& also_file1_data = file_data_cache.get("file1");
 		assert(file_data_cache.reference_count("file1") == 2);
 
-		// 3. Release values when you don't need nor want them anymore.
+
+		// 3. Release values when you don't need/want them anymore.
 		// This decrements the reference count by 1.
 		file_data_cache.release("file1");
 		assert(file_data_cache.reference_count("file1") == 1);
@@ -89,5 +93,10 @@ TEST_CASE("README.md examples", "[flyweight][readme]") {
 		}
 		// At this point, `autoreleased_file1_data` released "file1" back to the flyweight.
 		assert(file_data_cache.reference_count("file1") == 1);
+
+
+		// 5. If you ever need it, call `clear` to release all values.
+		// This may be used, for example, to clear cache objects when memory is running low.
+		file_data_cache.clear();
 	}
 }
