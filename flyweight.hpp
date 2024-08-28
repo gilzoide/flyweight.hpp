@@ -205,8 +205,8 @@ struct autorelease_value {
 	T& value;
 
 	/// Constructor.
-	autorelease_value(T& value, Flyweight& flyweight, const ArgTuple& arg_tuple)
-		: value(value)
+	autorelease_value(Flyweight& flyweight, const ArgTuple& arg_tuple)
+		: value(flyweight.get(arg_tuple))
 		, flyweight(flyweight)
 		, arg_tuple(arg_tuple)
 	{
@@ -215,8 +215,7 @@ struct autorelease_value {
 	/// Copy constructor.
 	/// Calls `flyweight::get_tuple` to make sure reference counting is correct.
 	autorelease_value(const autorelease_value& other)
-		: value(other.flyweight.get(other.arg_tuple))
-		, flyweight(other.flyweight)
+		: flyweight(other.flyweight)
 		, arg_tuple(other.arg_tuple)
 	{
 	}
@@ -326,7 +325,6 @@ public:
 	/// @see get
 	autorelease_value get_autorelease(const std::tuple<Args...>& arg_tuple) {
 		return {
-			get(arg_tuple),
 			*this,
 			arg_tuple,
 		};
@@ -411,14 +409,12 @@ public:
 	/// @see flyweight::get_autorelease
 	autorelease_value get_autorelease(const std::tuple<Args...>& arg_tuple) {
 		return {
-			get(arg_tuple),
 			*this,
 			arg_tuple,
 		};
 	}
 
 	/// Checks the current reference count for the value mapped to the passed arguments.
-	/// @see reference_count_tuple
 	size_t reference_count(const std::tuple<Args...>& arg_tuple) const {
 		auto it = base::map.find(arg_tuple);
 		if (it != base::map.end()) {
