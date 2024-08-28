@@ -320,11 +320,6 @@ public:
 		}
 		return it->second;
 	}
-	/// Alternative to `flyweight::get` with the arguments unpacked.
-	template<bool uses_multiple_args = (sizeof...(Args) > 1)>
-	auto get(Args&&... args) -> typename std::enable_if<uses_multiple_args, T&>::type {
-		return get(std::tuple<Args...> { std::forward<Args>(args)... });
-	}
 
 	/// Alternative to `flyweight::get` that returns an `autorelease_value`.
 	/// This enables the RAII idiom for automatically releasing values.
@@ -336,20 +331,10 @@ public:
 			arg_tuple,
 		};
 	}
-	/// Alternative to `flyweight::get_autorelease` with the arguments unpacked.
-	template<bool uses_multiple_args = (sizeof...(Args) > 1)>
-	auto get_autorelease(Args&&... args) -> typename std::enable_if<uses_multiple_args, autorelease_value>::type {
-		return get_autorelease(std::tuple<Args...> { std::forward<Args>(args)... });
-	}
 
 	/// Check whether the value mapped to the passed arguments is loaded.
 	bool is_loaded(const std::tuple<Args...>& arg_tuple) const {
 		return map.find(arg_tuple) != map.end();
-	}
-	/// Alternative to `flyweight::is_loaded` with the arguments unpacked.
-	template<bool uses_multiple_args = (sizeof...(Args) > 1)>
-	auto is_loaded(Args&&... args) const -> typename std::enable_if<uses_multiple_args, bool>::type {
-		return is_loaded(std::tuple<Args...> { std::forward<Args>(args)... });
 	}
 
 	/// Release the value mapped to the passed arguments.
@@ -365,11 +350,6 @@ public:
 		else {
 			return false;
 		}
-	}
-	/// Alternative to `flyweight::release` with the arguments unpacked.
-	template<bool uses_multiple_args = (sizeof...(Args) > 1)>
-	auto release(Args&&... args) -> typename std::enable_if<uses_multiple_args, bool>::type {
-		return release(std::tuple<Args...> { std::forward<Args>(args)... });
 	}
 
 	/// Release all values, calling the deleter functor on them.
@@ -426,11 +406,6 @@ public:
 		auto& value = base::get(arg_tuple);
 		return value.reference();
 	}
-	/// Alternative to `flyweight_refcounted::get` with the arguments unpacked.
-	template<bool uses_multiple_args = (sizeof...(Args) > 1)>
-	auto get(Args&&... args) -> typename std::enable_if<uses_multiple_args, T&>::type {
-		return get(std::tuple<Args...> { std::forward<Args>(args)... });
-	}
 
 	/// Override for `flyweight::get_autorelease` with reference counting.
 	/// @see flyweight::get_autorelease
@@ -440,11 +415,6 @@ public:
 			*this,
 			arg_tuple,
 		};
-	}
-	/// Alternative to `flyweight_refcounted::get_autorelease` with the arguments unpacked.
-	template<bool uses_multiple_args = (sizeof...(Args) > 1)>
-	auto get_autorelease(Args&&... args) -> typename std::enable_if<uses_multiple_args, autorelease_value>::type {
-		return get_autorelease(std::tuple<Args...> { std::forward<Args>(args)... });
 	}
 
 	/// Checks the current reference count for the value mapped to the passed arguments.
@@ -457,11 +427,6 @@ public:
 		else {
 			return 0;
 		}
-	}
-	/// Alternative to `flyweight_refcounted::reference_count` with the arguments unpacked.
-	template<bool uses_multiple_args = (sizeof...(Args) > 1)>
-	auto reference_count(Args&&... args) const -> typename std::enable_if<uses_multiple_args, size_t>::type {
-		return reference_count(std::tuple<Args...> { std::forward<Args>(args)... });
 	}
 
 	/// Override for `flyweight::release` with reference counting.
@@ -476,11 +441,6 @@ public:
 		else {
 			return false;
 		}
-	}
-	/// Alternative to `flyweight_refcounted::release` with the arguments unpacked.
-	template<bool uses_multiple_args = (sizeof...(Args) > 1)>
-	auto release(Args&&... args) -> typename std::enable_if<uses_multiple_args, bool>::type {
-		return release(std::tuple<Args...> { std::forward<Args>(args)... });
 	}
 };
 
