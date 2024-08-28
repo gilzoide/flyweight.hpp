@@ -96,19 +96,19 @@ namespace detail {
 	template<typename... Args>
 	struct tuple_hasher {
 		constexpr size_t operator()(const std::tuple<Args...>& value) const {
-			return hash_tuple<std::tuple<Args...>, 0, Args...>(value);
+			return hash_tuple<0, Args...>(value);
 		}
 
-		template<typename TTuple, size_t I, typename T>
-		constexpr static size_t hash_tuple(const TTuple& v) {
+		template<size_t I, typename T>
+		constexpr static size_t hash_tuple(const std::tuple<Args...>& v) {
 			return std::hash<T>{}(std::get<I>(v));
 		}
 
-		template<typename TTuple, size_t I, typename T1, typename T2, typename... Rest>
-		constexpr static size_t hash_tuple(const TTuple& v) {
+		template<size_t I, typename T1, typename T2, typename... Rest>
+		constexpr static size_t hash_tuple(const std::tuple<Args...>& v) {
 			return hash_combine(
-				hash_tuple<TTuple, I, T1>(v),
-				hash_tuple<TTuple, I+1, T2, Rest...>(v)
+				hash_tuple<I, T1>(v),
+				hash_tuple<I+1, T2, Rest...>(v)
 			);
 		}
 	};
