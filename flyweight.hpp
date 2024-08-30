@@ -126,6 +126,9 @@ namespace detail {
 		operator T&() {
 			return value;
 		}
+		operator const T&() const {
+			return value;
+		}
 
 		/// Increment the reference count.
 		refcounted_value& reference() {
@@ -235,12 +238,21 @@ struct autorelease_value {
 	T& operator*() {
 		return value;
 	}
+	const T& operator*() const {
+		return value;
+	}
 	/// Returns the wrapped value.
 	T& operator->() {
 		return value;
 	}
+	const T& operator->() const {
+		return value;
+	}
 	/// Returns the wrapped value.
 	operator T&() {
+		return value;
+	}
+	operator const T&() const {
 		return value;
 	}
 
