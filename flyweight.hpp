@@ -6,10 +6,11 @@
  * #include "flyweight.hpp"
  *
  * // 1. Declare your flyweight instance.
- * // The first template type is the value type.
- * // The rest are argument types used to create values.
+ * // The first template type is the key type.
+ * // The second template type is the value type that will be created with the passed key.
+ * // The third optional template type is the map type used to maintain the values, defaults to std::unordered_map.
  * // In this example, we're defining a resource manager for images.
- * flyweight::flyweight<Image, std::string> my_image_flyweight {
+ * flyweight::flyweight<std::string, Image> my_image_flyweight {
  *     // (optional) Pass a creator functor that will be called to create values.
  *     [](const std::string& image_name) {
  *         return LoadImage(image_name);
@@ -86,42 +87,15 @@
 namespace flyweight {
 
 namespace detail {
-	/// Combine two integer hash values
-	/// @see https://github.com/boostorg/multiprecision/blob/de3243f3e5427c6ab5b050aac03bc89c6e03e2bc/include/boost/multiprecision/detail/hash.hpp#L35-L41
-	constexpr static size_t hash_combine(size_t a, size_t b) {
-		return a ^ b + 0x9e3779b9 + (a << 6) + (a >> 2);
-	}
-
-	/// Hasher implementation for std::tuple<...>
-	template<typename... Args>
-	struct tuple_hasher {
-		constexpr size_t operator()(const std::tuple<Args...>& value) const {
-			return hash_tuple<0, Args...>(value);
-		}
-
-		template<size_t I, typename T>
-		constexpr static size_t hash_tuple(const std::tuple<Args...>& v) {
-			return std::hash<T>{}(std::get<I>(v));
-		}
-
-		template<size_t I, typename T1, typename T2, typename... Rest>
-		constexpr static size_t hash_tuple(const std::tuple<Args...>& v) {
-			return hash_combine(
-				hash_tuple<I, T1>(v),
-				hash_tuple<I+1, T2, Rest...>(v)
-			);
-		}
-	};
-
 	/// Reference counted value, used for flyweight_refcounted
 	template<typename T>
 	struct refcounted_value {
 		T value;
-		long long refcount;
+		long long refcount = 0;
 
 		/// Construct a value with an initial reference count of 0.
 		/// `reference` should be called right after constructing this.
-		refcounted_value(T&& value) : value(value), refcount(0) {}
+		refcounted_value(T&& value) : value(value) {}
 
 		operator T&() {
 			return value;
@@ -143,39 +117,6 @@ namespace detail {
 			return refcount <= 0;
 		}
 	};
-
-#if __cpp_lib_apply
-	template<typename Fn, typename... Args>
-	auto apply(Fn&& f, std::tuple<Args...>&& t) {
-		return std::apply(std::move(f), std::move(t));
-	}
-#else
-	// Unpacking tuple with int sequence on C++11
-	// Reference: https://stackoverflow.com/a/7858971
-	template<int...>
-	struct seq {};
-
-	template<int N, int... S>
-	struct gens : gens<N-1, N-1, S...> {};
-
-	template<int... S>
-	struct gens<0, S...> {
-		using type = seq<S...>;
-	};
-
-	template<typename... Args>
-	struct apply_impl {
-		template<typename Fn, int... S>
-		static auto invoke(Fn&& f, std::tuple<Args...>&& t, seq<S...>) {
-			return f(std::forward<Args>(std::get<S>(t))...);
-		}
-	};
-
-	template<typename Fn, typename... Args>
-	auto apply(Fn&& f, std::tuple<Args...>&& t) {
-		return apply_impl<Args...>::invoke(std::move(f), std::move(t), typename gens<sizeof...(Args)>::type{});
-	}
-#endif
 }
 
 
@@ -203,35 +144,31 @@ struct default_deleter {
 };
 
 /// Value wrapper that releases it back to the owning flyweight upon destruction.
-template<typename T, typename Flyweight, typename ArgTuple>
+template<typename Key, typename T, typename Flyweight>
 struct autorelease_value {
 	T& value;
 
 	/// Constructor.
-	autorelease_value(Flyweight& flyweight, const ArgTuple& arg_tuple)
-		: value(flyweight.get(arg_tuple))
+	autorelease_value(Flyweight& flyweight, const Key& key)
+		: value(flyweight.get(key))
 		, flyweight(flyweight)
-		, arg_tuple(arg_tuple)
+		, key(key)
 	{
 	}
 
 	/// Copy constructor.
-	/// Calls `flyweight::get_tuple` to make sure reference counting is correct.
-	autorelease_value(const autorelease_value& other)
-		: flyweight(other.flyweight)
-		, arg_tuple(other.arg_tuple)
-	{
-	}
+	autorelease_value(const autorelease_value& other) : autorelease_value(other.flyweight, other.key) {}
+
 	/// Copy assignment.
-	/// Releases the previously referenced value and calls `flyweight.get_tuple` to make sure reference counting is correct.
+	/// Releases the previously referenced value and calls `flyweight.get` to make sure reference counting is correct.
 	autorelease_value& operator=(const autorelease_value& other)
 	{
 		// release previous value
-		flyweight.release(arg_tuple);
+		flyweight.release(key);
 		// re-get the value to make sure reference counting is correct
-		value = other.flyweight.get(other.arg_tuple);
+		value = other.flyweight.get(other.key);
 		flyweight = other.flyweight;
-		arg_tuple = other.arg_tuple;
+		key = other.key;
 	}
 
 	/// Returns the wrapped value.
@@ -258,55 +195,57 @@ struct autorelease_value {
 
 	/// Release the value back to the owning flyweight.
 	~autorelease_value() {
-		flyweight.release(arg_tuple);
+		flyweight.release(key);
 	}
 
 private:
 	Flyweight& flyweight;
-	ArgTuple arg_tuple;
+	Key key;
 };
 
 /**
- * Factory for flyweight objects of type `T`, created with arguments of type `Args...`.
+ * Factory for flyweight objects of type `T`, created with a key of type `Key`.
  *
- * When getting a value, the flyweight first checks for an existing value associated with the passed arguments, returning a reference to it if found.
+ * When getting a value, the flyweight first checks for an existing value associated with the passed key, returning a reference to it if found.
  * Otherwise, a new value is created and cached for future requests.
  * When no longer needed, an existing value may be released by calling `flyweight::release`.
  *
  * Flyweights are useful as a way to load heavy objects only once and sharing them whenever necessary, for example images used as icons in an interactive app.
  * Flyweights can also be used to implement string interning and function result memoization.
  *
+ * @tparam Key  Key mapped to loaded values.
  * @tparam T  Value type.
- * @tparam Args  Arguments mapped to loaded values.
+ * @tparam Map  Internal type used to map keys to values. Defaults to `std::unordered_map`.
  */
-template<typename T, typename... Args>
+template<typename Key, typename T, typename Map = std::unordered_map<Key, T>>
 class flyweight {
 public:
-	using value = T;
-	using autorelease_value = autorelease_value<T, flyweight, std::tuple<Args...>>;
+	using key_type = Key;
+	using value_type = T;
+	using autorelease_value_type = autorelease_value<Key, T, flyweight>;
 
 	/// Default constructor.
 	/// Uses `default_creator` as the value creator and `default_deleter` as the value deleter.
-	flyweight() : creator(default_creator<T, Args...>{}), deleter(default_deleter<T>{}) {}
+	flyweight() : creator(default_creator<T, Key>{}), deleter(default_deleter<T>{}) {}
 
 	/// Constructor with custom value creator functor.
 	/// @param creator  Creator functor that will be called when creating a mapped value for the first time.
-	///                 It will be called with the arguments passed to `flyweight::get` or `flyweight::get_tuple`.
+	///                 It will be called with a const reference to the key passed to `flyweight::get`.
 	template<typename Creator>
 	flyweight(Creator&& creator)
-		: creator([creator](Args&&... args) { return creator(std::forward<Args>(args)...); })
+		: creator([creator](const Key& key) { return creator(key); })
 		, deleter(default_deleter<T>{})
 	{
 	}
 
 	/// Constructor with custom value creator functor and deleter functor.
 	/// @param creator  Creator functor that will be called when creating a mapped value for the first time.
-	///                 It will be called with the arguments passed to `flyweight::get` or `flyweight::get_tuple`.
+	///                 It will be called with a const reference to the key passed to `flyweight::get`.
 	/// @param deleter  Deleter functor that will be called when releasing a mapped value.
-	///                 It will be called by `flyweight::release` or `flyweight::release_tuple` with a reference to the value.
+	///                 It will be called by `flyweight::release` with a reference to the value.
 	template<typename Creator, typename Deleter>
 	flyweight(Creator&& creator, Deleter&& deleter)
-		: creator([creator](Args&&... args) { return creator(std::forward<Args>(args)...); })
+		: creator([creator](const Key& key) { return creator(key); })
 		, deleter([deleter](T& value) { deleter(value); })
 	{
 	}
@@ -321,13 +260,13 @@ public:
 	/// Gets the value associated to the passed arguments.
 	/// If the value was already created, a reference to the existing value is returned.
 	/// Otherwise, the value is created using the creator functor passed on the flyweight's constructor.
-	/// @param args  Arguments that represent a value.
-	///              These will be forwarded to the creator functor if the value is not loaded yet.
+	/// @param key Key that represent a value.
+	///            It will be passed to the creator functor if the value is not loaded yet.
 	/// @return Reference to the value mapped to the passed arguments.
-	T& get(const std::tuple<Args...>& arg_tuple) {
-		auto it = map.find(arg_tuple);
+	T& get(const Key& key) {
+		auto it = map.find(key);
 		if (it == map.end()) {
-			it = map.emplace(arg_tuple, detail::apply(creator, (std::tuple<Args...>) arg_tuple)).first;
+			it = map.emplace(key, creator(key)).first;
 		}
 		return it->second;
 	}
@@ -335,23 +274,23 @@ public:
 	/// Alternative to `flyweight::get` that returns an `autorelease_value`.
 	/// This enables the RAII idiom for automatically releasing values.
 	/// @see get
-	autorelease_value get_autorelease(const std::tuple<Args...>& arg_tuple) {
+	autorelease_value_type get_autorelease(const Key& key) {
 		return {
 			*this,
-			arg_tuple,
+			key,
 		};
 	}
 
-	/// Check whether the value mapped to the passed arguments is loaded.
-	bool is_loaded(const std::tuple<Args...>& arg_tuple) const {
-		return map.find(arg_tuple) != map.end();
+	/// Check whether the value mapped to the passed key is loaded.
+	bool is_loaded(const Key& key) const {
+		return map.find(key) != map.end();
 	}
 
-	/// Release the value mapped to the passed arguments.
+	/// Release the value mapped to the passed key.
 	/// Trying to release a value that is not loaded is a no-op.
 	/// @return `true` if a loaded value was released, `false` otherwise.
-	bool release(const std::tuple<Args...>& arg_tuple) {
-		auto it = map.find(arg_tuple);
+	bool release(const Key& key) {
+		auto it = map.find(key);
 		if (it != map.end()) {
 			deleter(it->second);
 			map.erase(it);
@@ -373,10 +312,10 @@ public:
 protected:
 	/// Value map.
 	/// Maps the tuple of arguments to an already loaded value of type `T`.
-	std::unordered_map<std::tuple<Args...>, T, detail::tuple_hasher<Args...>> map;
+	Map map;
 	/// Creator function.
 	/// Wraps the creator functor passed when constructing the flyweight, if any.
-	std::function<T(Args&&...)> creator;
+	std::function<T(const Key&)> creator;
 	/// Deleter function.
 	/// Wraps the deleter functor passed when constructing the flyweight, if any.
 	std::function<void(T&)> deleter;
@@ -384,52 +323,90 @@ protected:
 
 
 /**
- * `flyweight` subclass that employs reference counting.
+ * Factory for flyweight objects of type `T`, created with a key of type `Key`, that employs reference counting.
  *
- * The reference count increments for each call to `flyweight_refcounted::get` and decrements for each call to `flyweight_refcounted::release` using the same arguments.
+ * The reference count increments for each call to `flyweight_refcounted::get` and decrements for each call to `flyweight_refcounted::release` using the same key.
  * When calling `flyweight_refcounted::release`, the value is actually deleted from the cache only when the reference count reaches zero.
  *
  * This is specially useful for implementing resource management of heavy objects, like images used as icons in an interactive app.
  *
- * @see flyweight
+ * @tparam Key  Key mapped to loaded values.
+ * @tparam T  Value type.
+ * @tparam Map  Internal type used to map keys to values. Defaults to `std::unordered_map`.
  */
-template<typename T, typename... Args>
-class flyweight_refcounted : public flyweight<detail::refcounted_value<T>, Args...> {
-	using base = flyweight<detail::refcounted_value<T>, Args...>;
+template<typename Key, typename T, typename Map = std::unordered_map<Key, detail::refcounted_value<T>>>
+class flyweight_refcounted {
 public:
-	using autorelease_value = autorelease_value<T, flyweight_refcounted, std::tuple<Args...>>;
+	using key_type = Key;
+	using value_type = T;
+	using autorelease_value_type = autorelease_value<Key, T, flyweight_refcounted>;
 
-	/// @see flyweight()
-	flyweight_refcounted() : base() {}
+	/// Default constructor.
+	/// Uses `default_creator` as the value creator and `default_deleter` as the value deleter.
+	flyweight_refcounted() : creator(default_creator<T, Key>{}), deleter(default_deleter<T>{}) {}
 
-	/// @see flyweight(Creator&&)
+	/// Constructor with custom value creator functor.
+	/// @param creator  Creator functor that will be called when creating a mapped value for the first time.
+	///                 It will be called with a const reference to the key passed to `flyweight_refcounted::get`.
 	template<typename Creator>
-	flyweight_refcounted(Creator&& creator) : base(creator) {}
-
-	/// @see flyweight(Creator&&, Deleter&&)
-	template<typename Creator, typename Deleter>
-	flyweight_refcounted(Creator&& creator, Deleter&& deleter) : base(creator, deleter) {}
-
-	/// Override for `flyweight::get` with reference counting.
-	/// @see flyweight::get
-	T& get(const std::tuple<Args...>& arg_tuple) {
-		auto& value = base::get(arg_tuple);
-		return value.reference();
+	flyweight_refcounted(Creator&& creator)
+		: creator([creator](const Key& key) { return creator(key); })
+		, deleter(default_deleter<T>{})
+	{
 	}
 
-	/// Override for `flyweight::get_autorelease` with reference counting.
-	/// @see flyweight::get_autorelease
-	autorelease_value get_autorelease(const std::tuple<Args...>& arg_tuple) {
+	/// Constructor with custom value creator functor and deleter functor.
+	/// @param creator  Creator functor that will be called when creating a mapped value for the first time.
+	///                 It will be called with a const reference to the key passed to `flyweight_refcounted::get`.
+	/// @param deleter  Deleter functor that will be called when releasing a mapped value.
+	///                 It will be called by `flyweight_refcounted::release` with a reference to the value.
+	template<typename Creator, typename Deleter>
+	flyweight_refcounted(Creator&& creator, Deleter&& deleter)
+		: creator([creator](const Key& key) { return creator(key); })
+		, deleter([deleter](T& value) { deleter(value); })
+	{
+	}
+
+	/// Calls the deleter functor to all remaining values, to ensure everything is cleaned up properly.
+	~flyweight_refcounted() {
+		for (auto it : map) {
+			deleter(it.second);
+		}
+	}
+
+	/// Gets the value associated to the passed arguments.
+	/// If the value was already created, a reference to the existing value is returned.
+	/// Otherwise, the value is created using the creator functor passed on the flyweight's constructor.
+	/// @param key Key that represent a value.
+	///            It will be passed to the creator functor if the value is not loaded yet.
+	/// @return Reference to the value mapped to the passed arguments.
+	T& get(const Key& key) {
+		auto it = map.find(key);
+		if (it == map.end()) {
+			it = map.emplace(key, creator(key)).first;
+		}
+		return it->second.reference();
+	}
+
+	/// Alternative to `flyweight_refcounted::get` that returns an `autorelease_value`.
+	/// This enables the RAII idiom for automatically releasing values.
+	/// @see get
+	autorelease_value_type get_autorelease(const Key& key) {
 		return {
 			*this,
-			arg_tuple,
+			key,
 		};
 	}
 
-	/// Checks the current reference count for the value mapped to the passed arguments.
-	size_t reference_count(const std::tuple<Args...>& arg_tuple) const {
-		auto it = base::map.find(arg_tuple);
-		if (it != base::map.end()) {
+	/// Check whether the value mapped to the passed key is loaded.
+	bool is_loaded(const Key& key) const {
+		return map.find(key) != map.end();
+	}
+
+	/// Get the current reference count for the value mapped to the passed key.
+	size_t reference_count(const Key& key) const {
+		auto it = map.find(key);
+		if (it != map.end()) {
 			return it->second.refcount;
 		}
 		else {
@@ -437,19 +414,40 @@ public:
 		}
 	}
 
-	/// Override for `flyweight::release` with reference counting.
-	/// The value will actually be released only when the reference count reaches zero.
-	bool release(const std::tuple<Args...>& arg_tuple) {
-		auto it = base::map.find(arg_tuple);
-		if (it != base::map.end() && it->second.dereference()) {
-			base::deleter(it->second);
-			base::map.erase(it);
+	/// Decrements the reference count for the value mapped to the passed key.
+	/// The value is only actually released when the reference count reaches zero.
+	/// Trying to release a value that is not loaded is a no-op.
+	/// @return `true` if a loaded value was released, `false` otherwise.
+	bool release(const Key& key) {
+		auto it = map.find(key);
+		if (it != map.end() && it->second.dereference()) {
+			deleter(it->second);
+			map.erase(it);
 			return true;
 		}
 		else {
 			return false;
 		}
 	}
+
+	/// Release all values, calling the deleter functor on them.
+	void clear() {
+		for (auto it : map) {
+			deleter(it.second);
+		}
+		map.clear();
+	}
+
+protected:
+	/// Value map.
+	/// Maps the tuple of arguments to an already loaded value of type `T`.
+	Map map;
+	/// Creator function.
+	/// Wraps the creator functor passed when constructing the flyweight, if any.
+	std::function<T(const Key&)> creator;
+	/// Deleter function.
+	/// Wraps the deleter functor passed when constructing the flyweight, if any.
+	std::function<void(T&)> deleter;
 };
 
 }

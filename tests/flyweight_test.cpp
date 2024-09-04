@@ -52,7 +52,7 @@ TEST_CASE("README.md examples", "[flyweight][readme]") {
 
 		// 1. Define your flyweight instance.
 		// In this case, we use the reference count enabled flyweight implementation.
-		flyweight::flyweight_refcounted<file_data, std::string> file_data_cache {
+		flyweight::flyweight_refcounted<std::string, file_data> file_data_cache {
 			// (optional) Pass a creator functor that will be called to create values.
 			[](const std::string& file_name) {
 				file_data data;
