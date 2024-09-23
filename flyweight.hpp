@@ -79,6 +79,7 @@
 #define __FLYWEIGHT_HPP__
 
 #include <functional>
+#include <mutex>
 #include <tuple>
 #include <type_traits>
 #include <unordered_map>
@@ -116,6 +117,11 @@ namespace detail {
 			--refcount;
 			return refcount <= 0;
 		}
+	};
+
+	struct dummy_mutex {};
+	struct dummy_lock {
+		template<typename T> dummy_lock(T) {}
 	};
 }
 
@@ -217,7 +223,7 @@ private:
  * @tparam T  Value type.
  * @tparam Map  Internal type used to map keys to values. Defaults to `std::unordered_map`.
  */
-template<typename Key, typename T, typename Map = std::unordered_map<Key, T>>
+template<typename Key, typename T, typename Map = std::unordered_map<Key, T>, typename Mutex = detail::dummy_mutex, typename Lock = detail::dummy_lock>
 class flyweight {
 public:
 	using key_type = Key;
@@ -252,6 +258,7 @@ public:
 
 	/// Calls the deleter functor to all remaining values, to ensure everything is cleaned up properly.
 	~flyweight() {
+		Lock lock { mutex };
 		for (auto it : map) {
 			deleter(it.second);
 		}
@@ -264,6 +271,7 @@ public:
 	///            It will be passed to the creator functor if the value is not loaded yet.
 	/// @return Reference to the value mapped to the passed arguments.
 	T& get(const Key& key) {
+		Lock lock { mutex };
 		auto it = map.find(key);
 		if (it == map.end()) {
 			it = map.emplace(key, creator(key)).first;
@@ -282,7 +290,8 @@ public:
 	}
 
 	/// Check whether the value mapped to the passed key is loaded.
-	bool is_loaded(const Key& key) const {
+	bool is_loaded(const Key& key) {
+		Lock lock { mutex };
 		return map.find(key) != map.end();
 	}
 
@@ -290,6 +299,7 @@ public:
 	/// Trying to release a value that is not loaded is a no-op.
 	/// @return `true` if a loaded value was released, `false` otherwise.
 	bool release(const Key& key) {
+		Lock lock { mutex };
 		auto it = map.find(key);
 		if (it != map.end()) {
 			deleter(it->second);
@@ -303,6 +313,7 @@ public:
 
 	/// Release all values, calling the deleter functor on them.
 	void clear() {
+		Lock lock { mutex };
 		for (auto it : map) {
 			deleter(it.second);
 		}
@@ -319,8 +330,11 @@ protected:
 	/// Deleter function.
 	/// Wraps the deleter functor passed when constructing the flyweight, if any.
 	std::function<void(T&)> deleter;
+	Mutex mutex;
 };
 
+template<typename Key, typename T, typename Map = std::unordered_map<Key, T>>
+using flyweight_threadsafe = flyweight<Key, T, Map, std::mutex, std::lock_guard<std::mutex>>;
 
 /**
  * Factory for flyweight objects of type `T`, created with a key of type `Key`, that employs reference counting.
@@ -334,7 +348,7 @@ protected:
  * @tparam T  Value type.
  * @tparam Map  Internal type used to map keys to values. Defaults to `std::unordered_map`.
  */
-template<typename Key, typename T, typename Map = std::unordered_map<Key, detail::refcounted_value<T>>>
+template<typename Key, typename T, typename Map = std::unordered_map<Key, detail::refcounted_value<T>>, typename Mutex = detail::dummy_mutex, typename Lock = detail::dummy_lock>
 class flyweight_refcounted {
 public:
 	using key_type = Key;
@@ -369,6 +383,7 @@ public:
 
 	/// Calls the deleter functor to all remaining values, to ensure everything is cleaned up properly.
 	~flyweight_refcounted() {
+		Lock lock { mutex };
 		for (auto it : map) {
 			deleter(it.second);
 		}
@@ -381,6 +396,7 @@ public:
 	///            It will be passed to the creator functor if the value is not loaded yet.
 	/// @return Reference to the value mapped to the passed arguments.
 	T& get(const Key& key) {
+		Lock lock { mutex };
 		auto it = map.find(key);
 		if (it == map.end()) {
 			it = map.emplace(key, creator(key)).first;
@@ -399,12 +415,14 @@ public:
 	}
 
 	/// Check whether the value mapped to the passed key is loaded.
-	bool is_loaded(const Key& key) const {
+	bool is_loaded(const Key& key) {
+		Lock lock { mutex };
 		return map.find(key) != map.end();
 	}
 
 	/// Get the current reference count for the value mapped to the passed key.
-	size_t reference_count(const Key& key) const {
+	size_t reference_count(const Key& key) {
+		Lock lock { mutex };
 		auto it = map.find(key);
 		if (it != map.end()) {
 			return it->second.refcount;
@@ -419,6 +437,7 @@ public:
 	/// Trying to release a value that is not loaded is a no-op.
 	/// @return `true` if a loaded value was released, `false` otherwise.
 	bool release(const Key& key) {
+		Lock lock { mutex };
 		auto it = map.find(key);
 		if (it != map.end() && it->second.dereference()) {
 			deleter(it->second);
@@ -432,6 +451,7 @@ public:
 
 	/// Release all values, calling the deleter functor on them.
 	void clear() {
+		Lock lock { mutex };
 		for (auto it : map) {
 			deleter(it.second);
 		}
@@ -448,7 +468,11 @@ protected:
 	/// Deleter function.
 	/// Wraps the deleter functor passed when constructing the flyweight, if any.
 	std::function<void(T&)> deleter;
+	Mutex mutex;
 };
+
+template<typename Key, typename T, typename Map = std::unordered_map<Key, detail::refcounted_value<T>>>
+using flyweight_refcounted_threadsafe = flyweight_refcounted<Key, T, Map, std::mutex, std::lock_guard<std::mutex>>;
 
 }
 
