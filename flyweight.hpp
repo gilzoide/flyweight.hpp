@@ -222,6 +222,8 @@ private:
  * @tparam Key  Key mapped to loaded values.
  * @tparam T  Value type.
  * @tparam Map  Internal type used to map keys to values. Defaults to `std::unordered_map`.
+ * @tparam Mutex  Internal type used for a mutex. Defaults to `detail::dummy_mutex`.
+ * @tparam Lock  Internal type used for locking the mutex. Defaults to `detail::dummy_lock`.
  */
 template<typename Key, typename T, typename Map = std::unordered_map<Key, T>, typename Mutex = detail::dummy_mutex, typename Lock = detail::dummy_lock>
 class flyweight {
@@ -333,6 +335,9 @@ protected:
 	Mutex mutex;
 };
 
+/**
+ * Alternative to `flyweight` that uses `std::mutex` and `std::lock_guard` for thread safety.
+ */
 template<typename Key, typename T, typename Map = std::unordered_map<Key, T>>
 using flyweight_threadsafe = flyweight<Key, T, Map, std::mutex, std::lock_guard<std::mutex>>;
 
@@ -347,6 +352,8 @@ using flyweight_threadsafe = flyweight<Key, T, Map, std::mutex, std::lock_guard<
  * @tparam Key  Key mapped to loaded values.
  * @tparam T  Value type.
  * @tparam Map  Internal type used to map keys to values. Defaults to `std::unordered_map`.
+ * @tparam Mutex  Internal type used for a mutex. Defaults to `detail::dummy_mutex`.
+ * @tparam Lock  Internal type used for locking the mutex. Defaults to `detail::dummy_lock`.
  */
 template<typename Key, typename T, typename Map = std::unordered_map<Key, detail::refcounted_value<T>>, typename Mutex = detail::dummy_mutex, typename Lock = detail::dummy_lock>
 class flyweight_refcounted {
@@ -471,6 +478,9 @@ protected:
 	Mutex mutex;
 };
 
+/**
+ * Alternative to `flyweight_refcounted` that uses `std::mutex` and `std::lock_guard` for thread safety.
+ */
 template<typename Key, typename T, typename Map = std::unordered_map<Key, detail::refcounted_value<T>>>
 using flyweight_refcounted_threadsafe = flyweight_refcounted<Key, T, Map, std::mutex, std::lock_guard<std::mutex>>;
 
