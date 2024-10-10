@@ -5,6 +5,7 @@ project(flyweight.hpp)
 option(FLYWEIGHT_BUILD_TESTS "Whether to build automated tests" OFF)
 
 add_library(flyweight.hpp INTERFACE flyweight.hpp)
+target_compile_features(flyweight.hpp INTERFACE cxx_std_11)
 target_include_directories(flyweight.hpp INTERFACE .)
 
 if(FLYWEIGHT_BUILD_TESTS)
