@@ -266,12 +266,12 @@ public:
 		}
 	}
 
-	/// Gets the value associated to the passed arguments.
+	/// Gets the value associated to the passed key.
 	/// If the value was already created, a reference to the existing value is returned.
 	/// Otherwise, the value is created using the creator functor passed on the flyweight's constructor.
 	/// @param key Key that represent a value.
 	///            It will be passed to the creator functor if the value is not loaded yet.
-	/// @return Reference to the value mapped to the passed arguments.
+	/// @return Reference to the value mapped to the passed key.
 	T& get(const Key& key) {
 		Lock lock { mutex };
 		auto it = map.find(key);
@@ -289,6 +289,21 @@ public:
 			*this,
 			key,
 		};
+	}
+
+	/// Gets the existing value associated to the passed key.
+	/// If the value was not created yet, returns `nullptr`.
+	/// @param key Key that represents a value.
+	/// @return Pointer to the existing value, or `nullptr` if the value is not loaded.
+	T *peek(const Key& key) {
+		Lock lock { mutex };
+		auto it = map.find(key);
+		if (it == map.end()) {
+			return nullptr;
+		}
+		else {
+			return &it->second;
+		}
 	}
 
 	/// Check whether the value mapped to the passed key is loaded.
@@ -419,6 +434,21 @@ public:
 			*this,
 			key,
 		};
+	}
+
+	/// Gets the existing value associated to the passed key.
+	/// If the value was not created yet, returns `nullptr`.
+	/// @param key Key that represents a value.
+	/// @return Pointer to the existing value, or `nullptr` if the value is not loaded.
+	T *peek(const Key& key) {
+		Lock lock { mutex };
+		auto it = map.find(key);
+		if (it == map.end()) {
+			return nullptr;
+		}
+		else {
+			return &it->second.value;
+		}
 	}
 
 	/// Check whether the value mapped to the passed key is loaded.
