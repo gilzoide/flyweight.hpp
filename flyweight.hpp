@@ -185,11 +185,11 @@ struct autorelease_value {
 		return value;
 	}
 	/// Returns the wrapped value.
-	T& operator->() {
-		return value;
+	T* operator->() {
+		return &value;
 	}
-	const T& operator->() const {
-		return value;
+	const T* operator->() const {
+		return &value;
 	}
 	/// Returns the wrapped value.
 	operator T&() {
