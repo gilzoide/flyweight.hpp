@@ -126,6 +126,6 @@ file_data_cache.clear();
 ## Integrating with CMake
 You can integrate flyweight.hpp with CMake targets by adding a copy of this repository and linking with the `flyweight.hpp` target:
 ```cmake
-add_subdirectory(path/to/flyweight.hpp)
+add_subdirectory("path/to/flyweight.hpp")
 target_link_libraries(my_awesome_target flyweight.hpp)
 ```
